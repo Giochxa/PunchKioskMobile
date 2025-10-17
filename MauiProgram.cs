@@ -31,10 +31,15 @@ namespace PunchKioskMobile
             builder.Services.AddScoped<IExportService, ExportService>();
 
             builder.Services.AddTransient<PunchViewModel>();
-            builder.Services.AddTransient<EmployeesViewModel>();
+            builder.Services.AddTransient<EmployeeViewModel>();
 
             builder.Services.AddTransient<PunchPage>();
             builder.Services.AddTransient<EmployeesPage>();
+
+            builder.Services.AddScoped<IPlatformService, PlatformService>();
+            builder.Services.AddTransient<ExportViewModel>();
+            builder.Services.AddTransient<ExportPage>();
+
 
             return builder.Build();
         }

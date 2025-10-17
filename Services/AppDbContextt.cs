@@ -4,7 +4,7 @@ using Microsoft.Maui.Storage;
 
 namespace PunchKioskMobile.Services;
 
-public class AppDbContext : DbContext
+public class AppDbContextt : DbContext
 {
     public DbSet<Punch> Punches { get; set; }
 
