@@ -1,43 +1,84 @@
-﻿// Services/EmployeeService.cs
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using PunchKioskMobile.Data.Repositories;
 using PunchKioskMobile.Models;
-using PunchKioskMobile.Services.Local;
-using System.Linq;
 
 namespace PunchKioskMobile.Services
 {
-    public class EmployeeService
+    public class EmployeeService : IEmployeeService
     {
-        private readonly ApiClient _api;
-        private readonly LocalDatabaseService _localDb;
+        private readonly IEmployeeRepository _employeeRepository;
+        private readonly IPunchRepository _punchRepository;
 
-        public EmployeeService(ApiClient api, LocalDatabaseService localDb)
+        public EmployeeService(IEmployeeRepository employeeRepository, IPunchRepository punchRepository)
         {
-            _api = api;
-            _localDb = localDb;
+            _employeeRepository = employeeRepository;
+            _punchRepository = punchRepository;
         }
 
-        // Fetch from backend and save locally (replace or update)
-        public async Task<List<EmployeeDto>> SyncEmployeesAsync()
+        public async Task<Employee> GetEmployeeAsync(int id)
         {
-            // backend should expose /api/employees returning list of EmployeeDto
-            var list = await _api.GetAsync<List<EmployeeDto>>("/api/employees");
-
-            if (list != null && list.Count > 0)
-            {
-                // mark last updated and upsert locally
-                foreach (var e in list)
-                {
-                    await _localDb.UpsertEmployeeAsync(e);
-                }
-            }
-
-            // return stored local list
-            return await _localDb.GetAllEmployeesAsync();
+            return await _employeeRepository.GetByIdAsync(id);
         }
 
-        public Task<List<EmployeeDto>> GetLocalEmployeesAsync() => _localDb.GetAllEmployeesAsync();
+        public async Task<Employee> GetEmployeeByCodeAsync(string employeeCode)
+        {
+            return await _employeeRepository.GetByCodeAsync(employeeCode);
+        }
+
+        public async Task<List<Employee>> GetAllEmployeesAsync()
+        {
+            return await _employeeRepository.GetAllAsync();
+        }
+
+        public async Task<List<Employee>> SearchEmployeesAsync(string searchTerm)
+        {
+            if (string.IsNullOrWhiteSpace(searchTerm))
+                return await GetAllEmployeesAsync();
+
+            return await _employeeRepository.SearchAsync(searchTerm);
+        }
+
+        public async Task<Employee> CreateEmployeeAsync(Employee employee)
+        {
+            if (await _employeeRepository.EmployeeCodeExistsAsync(employee.EmployeeCode))
+                throw new InvalidOperationException($"Employee with code {employee.EmployeeCode} already exists.");
+
+            return await _employeeRepository.AddAsync(employee);
+        }
+
+        public async Task<Employee> UpdateEmployeeAsync(Employee employee)
+        {
+            var existing = await _employeeRepository.GetByIdAsync(employee.Id);
+            if (existing == null)
+                throw new ArgumentException("Employee not found.");
+
+            if (existing.EmployeeCode != employee.EmployeeCode &&
+                await _employeeRepository.EmployeeCodeExistsAsync(employee.EmployeeCode))
+                throw new InvalidOperationException($"Employee with code {employee.EmployeeCode} already exists.");
+
+            return await _employeeRepository.UpdateAsync(employee);
+        }
+
+        public async Task<bool> DeleteEmployeeAsync(int id)
+        {
+            return await _employeeRepository.DeleteAsync(id);
+        }
+
+        public async Task<bool> CanPunchAsync(int employeeId, DateTime punchTime)
+        {
+            var employee = await _employeeRepository.GetByIdAsync(employeeId);
+            if (employee == null)
+                return false;
+
+            return true;
+        }
+
+        public async Task<Employee> FindEmployeeAsync(string searchTerm)
+        {
+            if (string.IsNullOrWhiteSpace(searchTerm))
+                return null;
+
+            var employees = await _employeeRepository.SearchAsync(searchTerm);
+            return employees.FirstOrDefault();
+        }
     }
 }

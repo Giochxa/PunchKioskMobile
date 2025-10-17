@@ -1,86 +1,88 @@
-﻿// Services/PunchService.cs
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using PunchKioskMobile.Data.Repositories;
 using PunchKioskMobile.Models;
-using PunchKioskMobile.Services.Local;
 
 namespace PunchKioskMobile.Services
 {
-    public class PunchService
+    public class PunchService : IPunchService
     {
-        private readonly ApiClient _api;
-        private readonly LocalDatabaseService _localDb;
-        private readonly SyncService _syncService;
+        private readonly IPunchRepository _punchRepository;
+        private readonly IEmployeeRepository _employeeRepository;
 
-        public PunchService(ApiClient api, LocalDatabaseService localDb, SyncService syncService)
+        public PunchService(IPunchRepository punchRepository, IEmployeeRepository employeeRepository)
         {
-            _api = api;
-            _localDb = localDb;
-            _syncService = syncService;
+            _punchRepository = punchRepository;
+            _employeeRepository = employeeRepository;
         }
 
-        // Submit a punch: try online, fallback to local pending queue
-        public async Task<bool> SubmitPunchAsync(PunchDto punch)
+        public async Task<PunchResult> PunchAsync(string employeeCode, string punchType, string notes = null)
         {
-            try
-            {
-                // Attempt immediate send to backend endpoint /api/punch
-                var response = await _api.PostAsync("/api/punch", punch);
-                if (response.IsSuccessStatusCode)
-                {
-                    return true;
-                }
-            }
-            catch
-            {
-                // ignore and fall back to local storage
-            }
+            var employee = await _employeeRepository.GetByCodeAsync(employeeCode);
+            if (employee == null)
+                return new PunchResult { Success = false, Message = "Employee not found." };
 
-            // Save to local pending queue
-            var pending = new PendingPunch
+            if (punchType != "IN" && punchType != "OUT")
+                return new PunchResult { Success = false, Message = "Invalid punch type. Must be IN or OUT." };
+
+            var now = DateTime.Now;
+
+            if (punchType == "IN" && await _punchRepository.HasPunchedInTodayAsync(employee.Id))
+                return new PunchResult { Success = false, Message = "Already punched IN today." };
+
+            if (punchType == "OUT" && await _punchRepository.HasPunchedOutTodayAsync(employee.Id))
+                return new PunchResult { Success = false, Message = "Already punched OUT today." };
+
+            if (punchType == "OUT" && !await _punchRepository.HasPunchedInTodayAsync(employee.Id))
+                return new PunchResult { Success = false, Message = "Cannot punch OUT without punching IN first." };
+
+            var punch = new Punch
             {
-                EmployeeCode = punch.EmployeeCode,
-                TimestampUtc = punch.TimestampUtc,
-                Type = punch.Type,
-                Notes = punch.Notes,
-                Synced = false
+                EmployeeId = employee.Id,
+                PunchType = punchType,
+                PunchTime = now,
+                Notes = notes,
+                DeviceInfo = DeviceInfo.Model,
+                Location = "Manual Entry"
             };
 
-            await _localDb.InsertPendingPunchAsync(pending);
-            return false;
+            var createdPunch = await _punchRepository.AddAsync(punch);
+
+            return new PunchResult
+            {
+                Success = true,
+                Message = $"Successfully punched {punchType} at {now:hh:mm tt}",
+                Punch = createdPunch,
+                Employee = employee
+            };
         }
 
-        // Force sync pending punches (called by SyncService)
-        public async Task SyncPendingAsync()
+        public async Task<List<Punch>> GetEmployeePunchesAsync(int employeeId)
         {
-            var pending = await _localDb.GetAllPendingPunchesAsync();
-            foreach (var p in pending)
-            {
-                try
-                {
-                    var dto = new PunchDto
-                    {
-                        EmployeeCode = p.EmployeeCode,
-                        TimestampUtc = p.TimestampUtc,
-                        Type = p.Type,
-                        Notes = p.Notes
-                    };
+            return await _punchRepository.GetByEmployeeIdAsync(employeeId);
+        }
 
-                    var resp = await _api.PostAsync("/api/punch", dto);
+        public async Task<List<Punch>> GetTodayPunchesAsync(int employeeId)
+        {
+            return await _punchRepository.GetTodayPunchesAsync(employeeId);
+        }
 
-                    if (resp.IsSuccessStatusCode)
-                    {
-                        // mark as synced locally
-                        await _localDb.MarkPendingAsSyncedAsync(p.LocalId);
-                    }
-                }
-                catch
-                {
-                    // stop or continue depending on policy; continue to next to avoid total halt
-                    continue;
-                }
-            }
+        public async Task<List<Punch>> GetPunchesByDateRangeAsync(int employeeId, DateTime startDate, DateTime endDate)
+        {
+            return await _punchRepository.GetPunchesByDateRangeAsync(employeeId, startDate, endDate);
+        }
+
+        public async Task<List<Punch>> GetAllPunchesByDateRangeAsync(DateTime startDate, DateTime endDate)
+        {
+            return await _punchRepository.GetAllPunchesByDateRangeAsync(startDate, endDate);
+        }
+
+        public async Task<bool> HasPunchedInTodayAsync(int employeeId)
+        {
+            return await _punchRepository.HasPunchedInTodayAsync(employeeId);
+        }
+
+        public async Task<bool> HasPunchedOutTodayAsync(int employeeId)
+        {
+            return await _punchRepository.HasPunchedOutTodayAsync(employeeId);
         }
     }
 }

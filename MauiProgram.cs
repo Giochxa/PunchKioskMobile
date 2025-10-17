@@ -1,53 +1,42 @@
-﻿//using PunchKioskMobile.Platforms.Windows;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using PunchKioskMobile.Data;
+using PunchKioskMobile.Data.Repositories;
 using PunchKioskMobile.Services;
-using PunchKioskMobile.Services.Local;
 using PunchKioskMobile.ViewModels;
 using PunchKioskMobile.Views.Pages;
 
-namespace PunchKioskMobile;
-
-public static class MauiProgram
+namespace PunchKioskMobile
 {
-    public static MauiApp CreateMauiApp()
+    public static class MauiProgram
     {
-        var builder = MauiApp.CreateBuilder();
-        builder
-            .UseMauiApp<App>()
-            .ConfigureFonts(fonts =>
-            {
-                fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
-            });
+        public static MauiApp CreateMauiApp()
+        {
+            var builder = MauiApp.CreateBuilder();
+            builder
+                .UseMauiApp<App>()
+                .ConfigureFonts(fonts =>
+                {
+                    fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
+                    fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+                });
 
-        // Services
-        builder.Services.AddSingleton<AppDbContext>();
-       
+            builder.Services.AddDbContext<AppDbContext>();
 
+            builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+            builder.Services.AddScoped<IPunchRepository, PunchRepository>();
 
-        // Register HttpClient with ApiClient wrapper
-        builder.Services.AddHttpClient<ApiClient>();
+            builder.Services.AddScoped<IEmployeeService, EmployeeService>();
+            builder.Services.AddScoped<IPunchService, PunchService>();
+            builder.Services.AddScoped<IExportService, ExportService>();
 
-        // Local DB
-        builder.Services.AddSingleton<LocalDatabaseService>();
+            builder.Services.AddTransient<PunchViewModel>();
+            builder.Services.AddTransient<EmployeesViewModel>();
 
-        // API services
-        builder.Services.AddSingleton<EmployeeService>();
-        builder.Services.AddSingleton<PunchService>();
+            builder.Services.AddTransient<PunchPage>();
+            builder.Services.AddTransient<EmployeesPage>();
 
-        // Sync service
-        builder.Services.AddSingleton<SyncService>();
-
-        // ViewModels
-        builder.Services.AddSingleton<PunchViewModel>();
-        builder.Services.AddSingleton<EmployeesViewModel>();
-
-        // Pages (inject ViewModels into Pages' constructors)
-        builder.Services.AddSingleton<PunchPage>();
-        builder.Services.AddSingleton<EmployeesPage>();
-
-        return builder.Build();
-
-        var sync = app.Services.GetService<SyncService>();
-        // start periodic sync every 60 seconds (or choose appropriate interval)
-        sync?.StartPeriodicSync(60);
+            return builder.Build();
+        }
     }
 }
