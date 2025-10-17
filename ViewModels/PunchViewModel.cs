@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Microsoft.Maui.Storage;
+using PunchKioskMobile.Models;
 using PunchKioskMobile.Services;
 
 namespace PunchKioskMobile.ViewModels;
@@ -35,7 +36,6 @@ public class PunchViewModel : INotifyPropertyChanged
             var photo = await MediaPicker.CapturePhotoAsync();
             if (photo != null)
             {
-                // Save or display photo
                 await Application.Current.MainPage.DisplayAlert("Photo Captured", photo.FullPath, "OK");
             }
         }
@@ -47,17 +47,11 @@ public class PunchViewModel : INotifyPropertyChanged
 
     private void PunchInOut()
     {
-        // Save punch to local SQLite database
         using var db = new AppDbContext();
-        db.Punches.Add(new Models.Punch
-        {
-            EmployeeId = EnteredId,
-            Timestamp = DateTime.Now
-        });
+        db.Punches.Add(new Punch { EmployeeId = EnteredId, Timestamp = DateTime.Now });
         db.SaveChanges();
-
         Application.Current.MainPage.DisplayAlert("Success", "Punch recorded!", "OK");
-        EnteredId = string.Empty; // Reset input
+        EnteredId = string.Empty;
     }
 
     public event PropertyChangedEventHandler PropertyChanged;

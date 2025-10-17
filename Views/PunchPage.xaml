@@ -3,10 +3,10 @@
              x:Class="PunchKioskMobile.Views.PunchPage"
              Title="Punch Kiosk">
 
-  <VerticalStackLayout Padding="20" Spacing="15">
-    <Label Text="Employee Punch" FontSize="24" HorizontalOptions="Center" />
-    <Entry Text="{Binding EnteredId}" Placeholder="Employee ID" Keyboard="Numeric"/>
-    <Button Text="Capture Photo" Command="{Binding CapturePhotoCommand}" />
-    <Button Text="Punch In/Out" Command="{Binding PunchCommand}" />
-  </VerticalStackLayout>
+    <VerticalStackLayout Padding="20" Spacing="15">
+        <Label Text="Employee Punch" FontSize="24" HorizontalOptions="Center" />
+        <Entry Text="{Binding EnteredId}" Placeholder="Employee ID" Keyboard="Numeric"/>
+        <Button Text="Capture Photo" Command="{Binding CapturePhotoCommand}" />
+        <Button Text="Punch In/Out" Command="{Binding PunchCommand}" />
+    </VerticalStackLayout>
 </ContentPage>

@@ -1,6 +1,6 @@
 ﻿using PunchKioskMobile.ViewModels;
 
-namespace PunchKiosk.Mobile.Views;
+namespace PunchKioskMobile.Views;
 
 public partial class PunchPage : ContentPage
 {
