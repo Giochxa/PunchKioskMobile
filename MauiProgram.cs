@@ -1,4 +1,4 @@
-﻿using PunchKioskMobile.Platforms.Windows;
+﻿//using PunchKioskMobile.Platforms.Windows;
 using PunchKioskMobile.Services;
 using PunchKioskMobile.Services.Local;
 using PunchKioskMobile.ViewModels;

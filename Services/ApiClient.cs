@@ -3,7 +3,7 @@ using System;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
-using PunchKioskMobile.Platforms.Shared;
+//using PunchKioskMobile.Shared;
 
 namespace PunchKioskMobile.Services
 {

@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using PunchKioskMobile.Models;
 using PunchKioskMobile.Services;
-using Xamarin.Forms; // MAUI uses Microsoft.Maui.Controls but Command exists in both; if using MAUI use Microsoft.Maui.Controls
+using Microsoft.Maui.Controls; // MAUI uses Microsoft.Maui.Controls but Command exists in both; if using MAUI use Microsoft.Maui.Controls
 
 namespace PunchKioskMobile.ViewModels
 {
