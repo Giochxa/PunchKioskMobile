@@ -1,0 +1,17 @@
+<!-- Views/Pages/PunchPage.xaml -->
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             x:Class="PunchKioskMobile.Views.Pages.PunchPage"
+             Title="Punch">
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="12">
+            <Label Text="Employee Code" />
+            <Entry Text="{Binding EmployeeCode}" Placeholder="Enter code" Keyboard="Numeric" />
+            <HorizontalStackLayout Spacing="12">
+                <Button Text="Punch IN" Command="{Binding PunchInCommand}" />
+                <Button Text="Punch OUT" Command="{Binding PunchOutCommand}" />
+            </HorizontalStackLayout>
+            <Label Text="{Binding StatusMessage}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

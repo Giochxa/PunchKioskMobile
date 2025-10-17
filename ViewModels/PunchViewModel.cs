@@ -1,60 +1,61 @@
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
+// ViewModels/PunchViewModel.cs
+using System;
+using System.Threading.Tasks;
 using System.Windows.Input;
-using Microsoft.Maui.Storage;
 using PunchKioskMobile.Models;
 using PunchKioskMobile.Services;
+using Xamarin.Forms; // MAUI uses Microsoft.Maui.Controls but Command exists in both; if using MAUI use Microsoft.Maui.Controls
 
-namespace PunchKioskMobile.ViewModels;
-
-public class PunchViewModel : INotifyPropertyChanged
+namespace PunchKioskMobile.ViewModels
 {
-    private string _enteredId;
-    public string EnteredId
+    public class PunchViewModel : BaseViewModel
     {
-        get => _enteredId;
-        set
+        private readonly PunchService _punchService;
+        private string _employeeCode;
+        private string _statusMessage;
+
+        public string EmployeeCode
         {
-            _enteredId = value;
-            OnPropertyChanged();
+            get => _employeeCode;
+            set => Set(ref _employeeCode, value);
         }
-    }
 
-    public ICommand CapturePhotoCommand { get; }
-    public ICommand PunchCommand { get; }
-
-    public PunchViewModel()
-    {
-        CapturePhotoCommand = new Command(CapturePhoto);
-        PunchCommand = new Command(PunchInOut);
-    }
-
-    private async void CapturePhoto()
-    {
-        try
+        public string StatusMessage
         {
-            var photo = await MediaPicker.CapturePhotoAsync();
-            if (photo != null)
+            get => _statusMessage;
+            set => Set(ref _statusMessage, value);
+        }
+
+        public ICommand PunchInCommand { get; }
+        public ICommand PunchOutCommand { get; }
+
+        public PunchViewModel(PunchService punchService)
+        {
+            _punchService = punchService;
+            PunchInCommand = new Command(async () => await ExecutePunchAsync("IN"));
+            PunchOutCommand = new Command(async () => await ExecutePunchAsync("OUT"));
+        }
+
+        private async Task ExecutePunchAsync(string type)
+        {
+            if (string.IsNullOrWhiteSpace(EmployeeCode))
             {
-                await Application.Current.MainPage.DisplayAlert("Photo Captured", photo.FullPath, "OK");
+                StatusMessage = "Enter employee code";
+                return;
             }
-        }
-        catch (Exception ex)
-        {
-            await Application.Current.MainPage.DisplayAlert("Error", ex.Message, "OK");
+
+            var punch = new PunchDto
+            {
+                EmployeeCode = EmployeeCode.Trim(),
+                TimestampUtc = DateTime.UtcNow,
+                Type = type,
+                Notes = null
+            };
+
+            var sent = await _punchService.SubmitPunchAsync(punch);
+
+            StatusMessage = sent ? $"{type} recorded online" : $"{type} saved locally (will sync)";
+            EmployeeCode = string.Empty;
         }
     }
-
-    private void PunchInOut()
-    {
-        using var db = new AppDbContext();
-        db.Punches.Add(new Punch { EmployeeId = EnteredId, Timestamp = DateTime.Now });
-        db.SaveChanges();
-        Application.Current.MainPage.DisplayAlert("Success", "Punch recorded!", "OK");
-        EnteredId = string.Empty;
-    }
-
-    public event PropertyChangedEventHandler PropertyChanged;
-    protected void OnPropertyChanged([CallerMemberName] string name = null)
-        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }

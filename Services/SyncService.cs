@@ -1,135 +1,47 @@
-using System.Net.Http;
-using System.Net.Http.Json;
+// Services/SyncService.cs
+using System;
+using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 
-public class SyncService
+namespace PunchKioskMobile.Services
 {
-    private readonly AppDbContext1 _context;
-    private readonly HttpClient _http;
-    private readonly string _serverUrl;
-
-    public SyncService(AppDbContext1 context, IHttpClientFactory httpFactory, IConfiguration config)
+    public class SyncService : IDisposable
     {
-        _context = context;
-        _http = httpFactory.CreateClient();
-        _serverUrl = config["SyncSettings:MainServerUrl"] 
-                     ?? throw new ArgumentNullException("MainServerUrl not found in config.");
-    }
+        private readonly PunchService _punchService;
+        private readonly EmployeeService _employeeService;
+        private Timer _timer;
 
-    public async Task SyncEmployeesAsync()
-    {
-        try
+        public SyncService(PunchService punchService, EmployeeService employeeService)
         {
-            var remote = await _http.GetFromJsonAsync<List<Employee>>($"{_serverUrl}/api/employees");
-            if (remote == null) return;
+            _punchService = punchService;
+            _employeeService = employeeService;
+        }
 
-            var local = await _context.Employees.ToListAsync();
+        // Start a periodic sync every N seconds (call Start from app)
+        public void StartPeriodicSync(int seconds = 60)
+        {
+            _timer = new Timer(async _ => await RunSyncAsync(), null, TimeSpan.Zero, TimeSpan.FromSeconds(seconds));
+        }
 
-            foreach (var remoteEmp in remote)
+        public async Task RunSyncAsync()
+        {
+            try
             {
-                var localEmp = local.FirstOrDefault(e => e.UniqueId == remoteEmp.UniqueId);
+                // Sync pending punches first
+                await _punchService.SyncPendingAsync();
 
-                if (localEmp != null)
-                {
-                    localEmp.FullName = remoteEmp.FullName;
-                    localEmp.IsActive = remoteEmp.IsActive;
-                    localEmp.PersonalId = remoteEmp.PersonalId;
-                }
-                else
-                {
-                    var newEmp = new Employee
-                    {
-                        UniqueId = remoteEmp.UniqueId,
-                        FullName = remoteEmp.FullName,
-                        IsActive = remoteEmp.IsActive,
-                        PersonalId = remoteEmp.PersonalId
-                    };
-
-                    _context.Employees.Add(newEmp);
-                }
+                // Then refresh employee list
+                await _employeeService.SyncEmployeesAsync();
             }
-
-            await _context.SaveChangesAsync();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[SyncEmployeesAsync] Error: {ex.Message}");
-            // TODO: Add logging if needed
-        }
-    }
-
-    public async Task PushPunchesAsync()
-{
-    try
-    {
-        var unsynced = await _context.PunchRecords
-            .Include(p => p.Employee)
-            .Where(p => !p.IsSynced)
-            .ToListAsync();
-
-        if (!unsynced.Any()) return;
-
-        foreach (var punch in unsynced)
-        {
-            var imageFileName = Path.GetFileName(punch.ImagePath);
-            var fullImagePath = Path.Combine("wwwroot", "punch_images", imageFileName);
-
-            if (!File.Exists(fullImagePath))
+            catch
             {
-                Console.WriteLine($"[PushPunchesAsync] Image file missing: {fullImagePath}");
-                continue; // or punch.IsSynced = true; to skip
+                // swallow errors (optional: add logging)
             }
-
-            var base64Image = Convert.ToBase64String(await File.ReadAllBytesAsync(fullImagePath));
-
-            var payload = new PunchRequest
-            {
-                UniqueId = punch.Employee?.UniqueId,
-                PunchTime = punch.PunchTime,
-                ImageBase64 = base64Image
-            };
-
-            var response = await _http.PostAsJsonAsync($"{_serverUrl}/api/punches", payload);
-                if (response.IsSuccessStatusCode)
-                {
-                    punch.IsSynced = true;
-                    punch.SyncedAt = DateTime.UtcNow;
-                }
-                else
-                {
-                    Console.WriteLine($"[PushPunchesAsync] Server error: {response.StatusCode}");
-                }
         }
 
-        await _context.SaveChangesAsync();
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[PushPunchesAsync] Error: {ex.Message}");
-    }
-}
-
-    public async Task SubmitPunchAsync(int employeeId)
-    {
-        var punch = new PunchRecord
+        public void Dispose()
         {
-            EmployeeId = employeeId,
-            PunchTime = DateTime.UtcNow,
-            IsSynced = false
-        };
-
-        _context.PunchRecords.Add(punch);
-        await _context.SaveChangesAsync();
-
-        try
-        {
-            await PushPunchesAsync();
-        }
-        catch
-        {
-            // Safe to ignore
+            _timer?.Dispose();
         }
     }
 }
